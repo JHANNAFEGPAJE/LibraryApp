@@ -1,227 +1,142 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, Image, StyleSheet, ScrollView, Dimensions } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as ImagePicker from "expo-image-picker";
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, Modal, Button, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import uuid from 'react-native-uuid';
 
-export default function App() {
+const LibraryApp = () => {
   const [books, setBooks] = useState([]);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [genre, setGenre] = useState("");
-  const [image, setImage] = useState(null);
+  const [search, setSearch] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
+  const [newBook, setNewBook] = useState({ title: '', price: '', image: '' });
 
   useEffect(() => {
     loadBooks();
   }, []);
 
   const loadBooks = async () => {
-    const storedBooks = await AsyncStorage.getItem("books");
+    const storedBooks = await AsyncStorage.getItem('books');
     if (storedBooks) setBooks(JSON.parse(storedBooks));
   };
 
-  const saveBooks = async (books) => {
-    await AsyncStorage.setItem("books", JSON.stringify(books));
-  };
+  const addOrEditBook = async () => {
+    if (!newBook.title || !newBook.price || !newBook.image) return;
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
-
-  const addBook = () => {
-    if (!title || !author || !genre || !image) {
-      Alert.alert("Error", "Please enter title, author, genre, and select an image.");
-      return;
-    }
+    let updatedBooks;
     if (editingBook) {
-      const updatedBooks = books.map((book) => 
-        book.id === editingBook.id ? { ...book, title, author, genre, image } : book
+      updatedBooks = books.map((book) =>
+        book.id === editingBook.id ? { ...editingBook, ...newBook } : book
       );
-      setBooks(updatedBooks);
-      saveBooks(updatedBooks);
-      setEditingBook(null);
     } else {
-      const newBook = { id: Date.now().toString(), title, author, genre, image, status: "Unread" };
-      const updatedBooks = [...books, newBook];
-      setBooks(updatedBooks);
-      saveBooks(updatedBooks);
+      const book = { id: uuid.v4(), ...newBook };
+      updatedBooks = [...books, book];
     }
-    setTitle("");
-    setAuthor("");
-    setGenre("");
-    setImage(null);
-  };
 
-  const deleteBook = (id) => {
-    const updatedBooks = books.filter(book => book.id !== id);
     setBooks(updatedBooks);
-    saveBooks(updatedBooks);
-  };
-
-  const toggleStatus = (id) => {
-    const updatedBooks = books.map(book => 
-      book.id === id ? { ...book, status: book.status === "Read" ? "Unread" : "Read" } : book
-    );
-    setBooks(updatedBooks);
-    saveBooks(updatedBooks);
+    await AsyncStorage.setItem('books', JSON.stringify(updatedBooks));
+    setNewBook({ title: '', price: '', image: '' });
+    setEditingBook(null);
+    setModalVisible(false);
   };
 
   const editBook = (book) => {
-    setTitle(book.title);
-    setAuthor(book.author);
-    setGenre(book.genre);
-    setImage(book.image);
+    setNewBook({ title: book.title, price: book.price, image: book.image });
     setEditingBook(book);
+    setModalVisible(true);
+  };
+
+  const deleteBook = async (id) => {
+    const updatedBooks = books.filter((book) => book.id !== id);
+    setBooks(updatedBooks);
+    await AsyncStorage.setItem('books', JSON.stringify(updatedBooks));
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>Book Library 📚</Text>
-      <TextInput
-        placeholder="Book Title"
-        value={title}
-        onChangeText={setTitle}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Author"
-        value={author}
-        onChangeText={setAuthor}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Genre"
-        value={genre}
-        onChangeText={setGenre}
-        style={styles.input}
-      />
-      <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-        <Text style={styles.imageButtonText}>Pick an Image</Text>
-      </TouchableOpacity>
-      {image && <Image source={{ uri: image }} style={styles.largeImage} />}
-      <TouchableOpacity style={styles.addButton} onPress={addBook}>
-        <Text style={styles.addButtonText}>{editingBook ? "Update Book" : "Add Book"}</Text>
-      </TouchableOpacity>
-      <FlatList
-        data={books}
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Ionicons name="grid" size={24} color="black" />
+        <Image source={{ uri: 'https://via.placeholder.com/40' }} style={styles.profileImage} />
+      </View>
+      <Text style={styles.title}>Discover your best books now</Text>
+      <Text style={styles.subtitle}>Find your dream book according to your preferences and join our family. What are you waiting for?</Text>
+      <View style={styles.searchContainer}>
+        <TextInput 
+          style={styles.searchBox} 
+          placeholder="Search for a book" 
+          value={search} 
+          onChangeText={setSearch} 
+        />
+       
+      </View>
+      <Text style={styles.sectionTitle}>Popular Now</Text>
+      <FlatList 
+        data={books.filter(book => book.title.toLowerCase().includes(search.toLowerCase()))}
         keyExtractor={(item) => item.id}
+        numColumns={3}
         renderItem={({ item }) => (
-          <View style={styles.bookItem}>
-            <Image source={{ uri: item.image }} style={styles.largeBookImage} />
-            <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle}>{item.title} - {item.author}</Text>
-              <Text style={styles.bookGenre}>Genre: {item.genre}</Text>
-              <Text style={styles.bookStatus}>Status: {item.status}</Text>
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => toggleStatus(item.id)}>
-                  <Text style={styles.toggleText}>{item.status === "Read" ? "Mark Unread" : "Mark Read"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => editBook(item)}>
-                  <Text style={styles.editText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteBook(item.id)}>
-                  <Text style={styles.deleteText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={styles.bookCard}>
+            <Image source={{ uri: item.image }} style={styles.bookImage} />
+            <Text style={styles.bookTitle}>{item.title}</Text>
+            <Text style={styles.bookPrice}>${item.price}</Text>
+            <View style={styles.cardButtons}>
+              <TouchableOpacity onPress={() => editBook(item)}>
+                <Text style={styles.editButton}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => deleteBook(item.id)}>
+                <Text style={styles.deleteButton}>Delete</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
       />
-    </ScrollView>
+      <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
+        <Text style={styles.addButtonText}>+ Add Book</Text>
+      </TouchableOpacity>
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{editingBook ? 'Edit Book' : 'Add Book'}</Text>
+            <TextInput placeholder="Title" style={styles.input} value={newBook.title} onChangeText={(text) => setNewBook({ ...newBook, title: text })} />
+            <TextInput placeholder="Price" style={styles.input} value={newBook.price} onChangeText={(text) => setNewBook({ ...newBook, price: text })} keyboardType="numeric" />
+            <TextInput placeholder="Image URL" style={styles.input} value={newBook.image} onChangeText={(text) => setNewBook({ ...newBook, image: text })} />
+            <View style={styles.modalButtons}>
+              <Button title={editingBook ? 'Update' : 'Add'} onPress={addOrEditBook} />
+              <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    backgroundColor: "#f5f5f5",
-    flex: 1,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
-    backgroundColor: "#fff",
-  },
-  bookGenre: {
-    fontSize: 14,
-    fontStyle: "italic",
-    color: "#555",
-  },
-  imageButton: {
-    backgroundColor: "#28a745",
-    padding: 10,
-    alignItems: "center",
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  imageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  largeImage: {
-    width: 200,
-    height: 200,
-    alignSelf: "center",
-    marginBottom: 10,
-    borderRadius: 10,
-  },
-  addButton: {
-    backgroundColor: "#007bff",
-    padding: 10,
-    alignItems: "center",
-    borderRadius: 5,
-  },
-  addButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  bookItem: {
-    padding: 10,
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    marginVertical: 5,
-    elevation: 2,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  largeBookImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  bookTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  bookStatus: {
-    fontSize: 14,
-    color: "gray",
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 5,
-    flex: 1,
-  },
-
-
-  
+  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  profileImage: { width: 40, height: 40, borderRadius: 20 },
+  title: { fontSize: 26, fontWeight: 'bold' },
+  subtitle: { fontSize: 14, color: 'gray', marginBottom: 20 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  searchBox: { flex: 1, borderWidth: 1, padding: 10, borderRadius: 10, marginRight: 10 },
+  filterButton: { backgroundColor: '#FF8A65', padding: 10, borderRadius: 10 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  bookCard: { marginRight: 10, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 10, alignItems: 'center' },
+  bookImage: { width: 100, height: 150, borderRadius: 10 },
+  bookTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 5 },
+  bookPrice: { fontSize: 14, color: 'gray' },
+  cardButtons: { flexDirection: 'row', marginTop: 5 },
+  editButton: { color: 'blue', marginRight: 10 },
+  deleteButton: { color: 'red' },
+  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 10, width: '80%', alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  input: { width: '100%', padding: 10, borderWidth: 1, borderRadius: 5, marginBottom: 10 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
+  addButton: { backgroundColor: '#000', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
+  addButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  bookCard: { flex: 1, margin: 5, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 10, alignItems: 'center' },
+  bookImage: { width: 100, height: 150, borderRadius: 10 },
 });
+
+export default LibraryApp;
