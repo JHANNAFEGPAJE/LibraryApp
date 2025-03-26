@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, Modal, Button, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import uuid from 'react-native-uuid';
 
 const LibraryApp = () => {
@@ -18,6 +19,25 @@ const LibraryApp = () => {
   const loadBooks = async () => {
     const storedBooks = await AsyncStorage.getItem('books');
     if (storedBooks) setBooks(JSON.parse(storedBooks));
+  };
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      alert("You need to allow access to your gallery!");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 6],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setNewBook({ ...newBook, image: result.assets[0].uri });
+    }
   };
 
   const addOrEditBook = async () => {
@@ -67,7 +87,6 @@ const LibraryApp = () => {
           value={search} 
           onChangeText={setSearch} 
         />
-       
       </View>
       <Text style={styles.sectionTitle}>Popular Now</Text>
       <FlatList 
@@ -99,7 +118,10 @@ const LibraryApp = () => {
             <Text style={styles.modalTitle}>{editingBook ? 'Edit Book' : 'Add Book'}</Text>
             <TextInput placeholder="Title" style={styles.input} value={newBook.title} onChangeText={(text) => setNewBook({ ...newBook, title: text })} />
             <TextInput placeholder="Price" style={styles.input} value={newBook.price} onChangeText={(text) => setNewBook({ ...newBook, price: text })} keyboardType="numeric" />
-            <TextInput placeholder="Image URL" style={styles.input} value={newBook.image} onChangeText={(text) => setNewBook({ ...newBook, image: text })} />
+            <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+              <Text style={styles.imagePickerText}>Pick an Image</Text>
+            </TouchableOpacity>
+            {newBook.image ? <Image source={{ uri: newBook.image }} style={styles.previewImage} /> : null}
             <View style={styles.modalButtons}>
               <Button title={editingBook ? 'Update' : 'Add'} onPress={addOrEditBook} />
               <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
@@ -118,10 +140,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: 'bold' },
   subtitle: { fontSize: 14, color: 'gray', marginBottom: 20 },
   searchContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  searchBox: { flex: 1, borderWidth: 1, padding: 10, borderRadius: 10, marginRight: 10 },
-  filterButton: { backgroundColor: '#FF8A65', padding: 10, borderRadius: 10 },
+  searchBox: { flex: 1, borderWidth: 1, padding: 10, borderRadius: 10 },
   sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  bookCard: { marginRight: 10, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 10, alignItems: 'center' },
+  bookCard: { flex: 1, margin: 5, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 10, alignItems: 'center' },
   bookImage: { width: 100, height: 150, borderRadius: 10 },
   bookTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 5 },
   bookPrice: { fontSize: 14, color: 'gray' },
@@ -132,11 +153,11 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 10, width: '80%', alignItems: 'center' },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   input: { width: '100%', padding: 10, borderWidth: 1, borderRadius: 5, marginBottom: 10 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
+  imagePicker: { backgroundColor: '#000', padding: 10, borderRadius: 5, marginBottom: 10 },
+  imagePickerText: { color: '#fff', textAlign: 'center' },
+  previewImage: { width: 100, height: 150, borderRadius: 10, marginTop: 10 },
   addButton: { backgroundColor: '#000', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
   addButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  bookCard: { flex: 1, margin: 5, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 10, alignItems: 'center' },
-  bookImage: { width: 100, height: 150, borderRadius: 10 },
 });
 
 export default LibraryApp;
